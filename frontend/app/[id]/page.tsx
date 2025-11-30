@@ -197,7 +197,7 @@ export default function JobApplyPage() {
       if (response.ok) {
         setSuccess(true);
       } else {
-        setError(data.error || "Failed to submit application");
+        setError(data.error || data.message || "Failed to submit application");
       }
     } catch {
       setError("Failed to connect to server. Please try again.");

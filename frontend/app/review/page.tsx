@@ -16,7 +16,8 @@ interface Resume {
   graduationYear: string;
   graduation_year?: string;
   skills: string[];
-  experience: number;
+  experience: string;
+  years_of_experience?: number;
   resumeUrl: string;
   resume_url?: string;
   submittedAt: string;
@@ -29,6 +30,20 @@ interface Resume {
   experience_score?: number;
   educationScore: number;
   education_score?: number;
+  keywordMatchScore?: number;
+  keyword_match_score?: number;
+  formattingScore?: number;
+  formatting_score?: number;
+  matchedKeywords?: string[];
+  matched_keywords?: string[];
+  missingKeywords?: string[];
+  missing_keywords?: string[];
+  matchedSkills?: string[];
+  matched_skills?: string[];
+  missingSkills?: string[];
+  missing_skills?: string[];
+  aiAnalysis?: string;
+  ai_analysis?: string;
   status: "pending" | "shortlisted" | "rejected" | "interviewed";
 }
 
@@ -80,13 +95,21 @@ export default function ReviewPage() {
           degree: app.degree || "",
           graduationYear: app.graduation_year || app.graduationYear || "",
           skills: app.skills || [],
-          experience: app.experience || 0,
+          experience: app.experience || "",
+          years_of_experience: app.years_of_experience || 0,
           resumeUrl: app.resume_url || app.resumeUrl || "#",
           submittedAt: app.submitted_at || app.submittedAt || new Date().toISOString(),
           overallScore: app.overall_score || app.overallScore || 0,
           skillMatchScore: app.skill_match_score || app.skillMatchScore || 0,
           experienceScore: app.experience_score || app.experienceScore || 0,
           educationScore: app.education_score || app.educationScore || 0,
+          keywordMatchScore: app.keyword_match_score || app.keywordMatchScore || 0,
+          formattingScore: app.formatting_score || app.formattingScore || 0,
+          matchedKeywords: app.matched_keywords || app.matchedKeywords || [],
+          missingKeywords: app.missing_keywords || app.missingKeywords || [],
+          matchedSkills: app.matched_skills || app.matchedSkills || [],
+          missingSkills: app.missing_skills || app.missingSkills || [],
+          aiAnalysis: app.ai_analysis || app.aiAnalysis || "",
           status: app.status || "pending",
         }));
         setResumes(transformedResumes);
@@ -201,6 +224,37 @@ export default function ReviewPage() {
         return "bg-blue-500/15 text-blue-600 dark:text-blue-400";
       default:
         return "bg-muted text-muted-foreground";
+    }
+  };
+
+  const [rescoring, setRescoring] = useState(false);
+
+  const rescoreAllApplications = async () => {
+    if (!job?.id) return;
+    
+    setRescoring(true);
+    try {
+      const token = localStorage.getItem("hr_token");
+      const response = await fetch(`http://localhost:5000/api/jobs/${job.id}/rescore-all`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        alert(`Successfully rescored ${data.rescored} applications with new ATS algorithm!`);
+        // Refresh applications
+        await fetchApplications(job.id);
+      } else {
+        alert("Failed to rescore applications");
+      }
+    } catch (error) {
+      console.error("Failed to rescore:", error);
+      alert("Error rescoring applications");
+    } finally {
+      setRescoring(false);
     }
   };
 
@@ -359,6 +413,25 @@ export default function ReviewPage() {
           <p className="text-muted-foreground text-sm">
             Showing <span className="text-foreground font-medium">{filteredResumes.length}</span> of {resumes.length} candidates
           </p>
+          <button
+            onClick={rescoreAllApplications}
+            disabled={rescoring || resumes.length === 0}
+            className="flex items-center gap-2 px-4 py-2 bg-primary/10 hover:bg-primary/20 text-primary rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {rescoring ? (
+              <>
+                <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                Rescoring...
+              </>
+            ) : (
+              <>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Rescore All with ATS
+              </>
+            )}
+          </button>
         </div>
 
         {/* Main Content */}
@@ -449,13 +522,13 @@ export default function ReviewPage() {
                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                             </svg>
-                            {resume.experience} yrs
+                            {resume.years_of_experience || 0} yrs
                           </span>
                           <span className="flex items-center gap-1">
                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                             </svg>
-                            {resume.submittedAt}
+                            {new Date(resume.submittedAt).toLocaleDateString()}
                           </span>
                         </div>
                         <span className={`px-2.5 py-1 rounded-full text-xs font-medium capitalize ${getStatusStyle(resume.status)}`}>
@@ -492,13 +565,15 @@ export default function ReviewPage() {
                     {/* Score Breakdown */}
                     <div>
                       <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                        Score Breakdown
+                        ATS Score Breakdown
                       </h4>
                       <div className="space-y-3">
                         {[
+                          { label: "Keyword Match", score: selectedResume.keywordMatchScore || 0, color: "bg-purple-500" },
                           { label: "Skill Match", score: selectedResume.skillMatchScore, color: "bg-primary" },
                           { label: "Experience", score: selectedResume.experienceScore, color: "bg-blue-500" },
                           { label: "Education", score: selectedResume.educationScore, color: "bg-green-500" },
+                          { label: "Resume Format", score: selectedResume.formattingScore || 0, color: "bg-orange-500" },
                         ].map((item) => (
                           <div key={item.label}>
                             <div className="flex justify-between text-sm mb-1">
@@ -515,6 +590,50 @@ export default function ReviewPage() {
                         ))}
                       </div>
                     </div>
+
+                    {/* Matched Skills */}
+                    {selectedResume.matchedSkills && selectedResume.matchedSkills.length > 0 && (
+                      <div>
+                        <h4 className="text-xs font-semibold text-green-600 uppercase tracking-wider mb-2">
+                          ✓ Matched Skills
+                        </h4>
+                        <div className="flex flex-wrap gap-1.5">
+                          {selectedResume.matchedSkills.slice(0, 10).map((skill, idx) => (
+                            <span key={idx} className="px-2 py-0.5 rounded text-xs bg-green-500/15 text-green-600 dark:text-green-400">
+                              {skill}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Missing Skills */}
+                    {selectedResume.missingSkills && selectedResume.missingSkills.length > 0 && (
+                      <div>
+                        <h4 className="text-xs font-semibold text-red-600 uppercase tracking-wider mb-2">
+                          ✗ Missing Skills
+                        </h4>
+                        <div className="flex flex-wrap gap-1.5">
+                          {selectedResume.missingSkills.slice(0, 8).map((skill, idx) => (
+                            <span key={idx} className="px-2 py-0.5 rounded text-xs bg-red-500/15 text-red-600 dark:text-red-400">
+                              {skill}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* AI Analysis */}
+                    {selectedResume.aiAnalysis && (
+                      <div className="bg-muted/50 rounded-xl p-4">
+                        <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                          🤖 AI Analysis
+                        </h4>
+                        <p className="text-sm text-foreground whitespace-pre-line">
+                          {selectedResume.aiAnalysis}
+                        </p>
+                      </div>
+                    )}
 
                     {/* Contact */}
                     <div className="bg-muted/50 rounded-xl p-4">
